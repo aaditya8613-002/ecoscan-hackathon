@@ -7,6 +7,15 @@ import hashlib
 import json
 import uuid
 import os
+import csv
+
+def log_correction(predicted, actual, conf):
+    file_exists = os.path.isfile("corrections_log.csv")
+    with open("corrections_log.csv", "a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(["Timestamp", "Predicted_Label", "Actual_Label", "Model_Confidence"])
+        writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), predicted, actual, f"{conf:.2f}%"])
 
 st.set_page_config(page_title="EcoScan", page_icon="♻️", layout="centered", initial_sidebar_state="collapsed")
 
@@ -295,6 +304,10 @@ if page == "📷 Scan":
                 key=f"correct_{scan_hash}")
             if st.button("submit correction", key=f"fix_{scan_hash}"):
                 correct_info = lookup(correct)
+                
+                # save to central CSV for ML retraining
+                log_correction(label, correct, conf)
+                
                 st.session_state.xp += 5  # bonus for helping improve
                 st.session_state.history.insert(0, {
                     "label": f"{correct.title()} (corrected)",
