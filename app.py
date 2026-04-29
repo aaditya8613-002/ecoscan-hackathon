@@ -4,17 +4,65 @@ from PIL import Image
 import tf_keras
 from datetime import datetime
 import hashlib
+import json
+import uuid
+import os
 
 st.set_page_config(page_title="EcoScan", page_icon="♻️", layout="centered", initial_sidebar_state="collapsed")
 
-# ── session state ─────────────────────────────────────────────────────────────
-def init_state():
-    defaults = dict(xp=0, streak=0, best_streak=0, history=[], total_co2=0,
-                    scans_today=0, last_hash=None, badges=set(), prev_level=0)
-    for k, v in defaults.items():
+# ── persistent storage (no login — UUID in URL) ───────────────────────────────
+DATA_DIR = "userdata"
+os.makedirs(DATA_DIR, exist_ok=True)
+
+def get_uid():
+    params = st.query_params
+    if "u" not in params:
+        new_id = uuid.uuid4().hex[:10]
+        st.query_params["u"] = new_id
+        return new_id
+    return params["u"]
+
+def data_file(uid):
+    return os.path.join(DATA_DIR, f"{uid}.json")
+
+def load_user(uid):
+    f = data_file(uid)
+    if os.path.exists(f):
+        try:
+            d = json.load(open(f))
+            d["badges"] = set(d.get("badges", []))
+            return d
+        except Exception:
+            pass
+    return dict(xp=0, streak=0, best_streak=0, history=[], total_co2=0,
+                last_hash=None, badges=set(), prev_level=0)
+
+def save_user(uid, data):
+    d = dict(data)
+    d["badges"] = list(d.get("badges", set()))
+    json.dump(d, open(data_file(uid), "w"))
+
+# ── init session ──────────────────────────────────────────────────────────────
+if "uid" not in st.session_state:
+    uid = get_uid()
+    st.session_state.uid = uid
+    saved = load_user(uid)
+    for k, v in saved.items():
+        st.session_state[k] = v
+    # ensure all keys exist
+    for k, v in dict(xp=0, streak=0, best_streak=0, history=[], total_co2=0,
+                     last_hash=None, badges=set(), prev_level=0).items():
         if k not in st.session_state:
             st.session_state[k] = v
-init_state()
+
+def persist():
+    """call after any state change to save to disk"""
+    save_user(st.session_state.uid, {
+        k: st.session_state[k]
+        for k in ["xp","streak","best_streak","history","total_co2",
+                  "last_hash","badges","prev_level"]
+    })
+
 
 # ── levels & badges ──────────────────────────────────────────────────────────
 LEVELS = [
@@ -254,6 +302,7 @@ if page == "📷 Scan":
                     "conf": 100.0, "co2": correct_info["co2"],
                     "xp": 5, "time": datetime.now().strftime("%H:%M")
                 })
+                persist()
                 st.success(f"thanks! logged as {correct.title()} · +5 XP for helping")
 
         # ── update state (only once per unique image) ──
@@ -305,6 +354,8 @@ if page == "📷 Scan":
             if new_level > st.session_state.prev_level:
                 st.session_state.prev_level = new_level
                 st.balloons()
+            
+            persist()
 
         # all class scores
         with st.expander("see all scores"):
@@ -423,6 +474,7 @@ elif page == "📋 History":
             st.session_state.total_co2 = 0
             st.session_state.badges = set()
             st.session_state.prev_level = 0
+            persist()
             st.rerun()
     else:
         st.markdown('<div class="empty">no scans yet — go sort some rubbish!</div>', unsafe_allow_html=True)
