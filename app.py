@@ -185,14 +185,15 @@ page = st.radio("", ["📷 Scan", "🌍 Impact", "🏅 Badges", "📋 History"],
 
 # ═══════════════════════════════════════════════════════════
 if page == "📷 Scan":
-# ═══════════════════════════════════════════════════════════
 
     t1, t2 = st.tabs(["Camera", "Upload"])
     img_file = None
     with t1:
-        img_file = st.camera_input("", label_visibility="collapsed")
+        cam = st.camera_input("Take a photo", label_visibility="collapsed")
+        if cam:
+            img_file = cam
     with t2:
-        up = st.file_uploader("", type=["jpg","jpeg","png"], label_visibility="collapsed")
+        up = st.file_uploader("Upload image", type=["jpg","jpeg","png"], label_visibility="collapsed")
         if up:
             img_file = up
 
@@ -286,9 +287,7 @@ if page == "📷 Scan":
     else:
         st.markdown('<div class="empty">point camera at any rubbish item<br>or drop in a photo</div>', unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════════════════════
 elif page == "🌍 Impact":
-# ═══════════════════════════════════════════════════════════
 
     co2 = st.session_state.total_co2
     km = round(co2 / 120, 2)
@@ -353,9 +352,7 @@ elif page == "🌍 Impact":
     else:
         st.markdown('<div class="empty">scan some items to see your impact!</div>', unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════════════════════
 elif page == "🏅 Badges":
-# ═══════════════════════════════════════════════════════════
 
     earned = st.session_state.badges
     st.markdown("**badges earned** — keep scanning to unlock more")
@@ -375,9 +372,7 @@ elif page == "🏅 Badges":
         st.markdown(f'<div style="color:{color};padding:0.3rem 0;font-size:0.88rem">{icon} {emoji} {name} — {thresh} XP</div>',
                     unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════════════════════
 elif page == "📋 History":
-# ═══════════════════════════════════════════════════════════
 
     if st.session_state.history:
         st.markdown(f"**last {len(st.session_state.history)} scans**")
