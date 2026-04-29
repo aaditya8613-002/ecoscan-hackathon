@@ -60,6 +60,7 @@ WASTE_INFO = {
     "organic": {"emoji":"🍂","co2":10,"bin":"Brown Bin","tip":"Great for composting!","xp":10,"color":"#22c55e"},
     "e-waste": {"emoji":"📱","co2":80,"bin":"E-Waste Drop","tip":"Never in regular bins — toxic.","xp":20,"color":"#ef4444"},
     "e_waste": {"emoji":"📱","co2":80,"bin":"E-Waste Drop","tip":"Never in regular bins — toxic.","xp":20,"color":"#ef4444"},
+    "others":  {"emoji":"🤷","co2":0, "bin":"Check locally","tip":"Could be glass, cardboard, or mixed waste — check your local council's guide.","xp":5,"color":"#f97316"},
 }
 
 def lookup(label):
@@ -210,14 +211,25 @@ if page == "📷 Scan":
         top = int(np.argmax(scores))
         label = class_names[top]
         conf = float(scores[0][top]) * 100
-        info = lookup(label)
+
+        # low confidence → fall back to 'others'
+        if conf < 30:
+            label = "others"
+            info = WASTE_INFO["others"]
+        else:
+            info = lookup(label)
 
         # ── show result ──
+        card_bg = "linear-gradient(135deg,rgba(249,115,22,0.12),rgba(251,146,60,0.06))" if label == "others" else "linear-gradient(135deg,rgba(34,197,94,0.12),rgba(74,222,128,0.06))"
+        card_border = "rgba(249,115,22,0.35)" if label == "others" else "rgba(34,197,94,0.3)"
+        label_color = "#fb923c" if label == "others" else "#4ade80"
+        conf_display = f"{conf:.1f}%" if label != "others" else "< 30% — not sure"
+
         st.markdown(f"""
-        <div class="result-card">
+        <div class="result-card" style="background:{card_bg};border-color:{card_border}">
           <div class="res-emoji">{info['emoji']}</div>
-          <div class="res-label">{label.title()}</div>
-          <div class="res-conf">{conf:.1f}% confidence</div>
+          <div class="res-label" style="color:{label_color}">{label.title()}</div>
+          <div class="res-conf">{conf_display} confidence</div>
           <div class="xp-pill">+{info['xp']} XP</div>
         </div>
         <div class="info-row">
@@ -227,6 +239,22 @@ if page == "📷 Scan":
         </div>
         <div class="tip-box">💡 {info['tip']}</div>
         """, unsafe_allow_html=True)
+
+        # ── report wrong prediction (inspired by deep-waste-app) ──
+        with st.expander("Wrong result? Tell us"):
+            correct = st.selectbox("what is it actually?",
+                ["plastic","paper","metal","organic","e-waste","others"],
+                key=f"correct_{scan_hash}")
+            if st.button("submit correction", key=f"fix_{scan_hash}"):
+                correct_info = lookup(correct)
+                st.session_state.xp += 5  # bonus for helping improve
+                st.session_state.history.insert(0, {
+                    "label": f"{correct.title()} (corrected)",
+                    "emoji": correct_info["emoji"],
+                    "conf": 100.0, "co2": correct_info["co2"],
+                    "xp": 5, "time": datetime.now().strftime("%H:%M")
+                })
+                st.success(f"thanks! logged as {correct.title()} · +5 XP for helping")
 
         # ── update state (only once per unique image) ──
         if scan_hash != st.session_state.last_hash:
